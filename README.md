@@ -24,3 +24,7 @@ uv run python monitor.py
 ## 状态
 
 V0 — 监控不下单（2026-05-19）
+
+---
+
+*Part of the [quant-research-log](https://github.com/Soli22de/quant-research-log) project family. 协作指南: [COLLABORATION.md](https://github.com/Soli22de/quant-research-log/blob/main/COLLABORATION.md)*
