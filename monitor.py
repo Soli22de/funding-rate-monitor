@@ -265,50 +265,74 @@ def save_report(report: str, diffs: List[Dict]):
 
 def main():
     import os
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--json", action="store_true", help="output JSON to stdout (for adapter consumption)")
+    args = parser.parse_args()
     os.makedirs("reports", exist_ok=True)
 
-    print("=" * 60)
-    print("  Funding Rate Monitor V0")
-    print("=" * 60)
-    print(f"  交易所: {EXCHANGES}")
-    print(f"  币种:   {SYMBOLS}")
-    print(f"  阈值:   {DIFF_THRESHOLD*100:.2f}% / 8h")
-    print()
+    if not args.json:
+        print("=" * 60)
+        print("  Funding Rate Monitor V0.1")
+        print("=" * 60)
+        print(f"  交易所: {EXCHANGES}")
+        print(f"  币种:   {SYMBOLS}")
+        print(f"  阈值:   {DIFF_THRESHOLD*100:.2f}% / 8h")
+        print()
 
     # 拉数据
-    print("[1/2] 拉取 funding rate...")
+    if not args.json:
+        print("[1/2] 拉取 funding rate...")
     data, ok, failed = fetch_all_rates()
-    print(f"  交易所 OK: {ok}, 失败: {failed}")
+    if not args.json:
+        print(f"  交易所 OK: {ok}, 失败: {failed}")
 
     # 计算差异
-    print("[2/2] 计算跨所差异...")
+    if not args.json:
+        print("[2/2] 计算跨所差异...")
     diffs = compute_diffs(data)
-
-    # 计算 spot+perp basis
     basis = fetch_basis(data, ok)
+
+    # Deploy signal count
+    deploy_count = sum(1 for ex_b in basis.values() for s_b in ex_b.values() if isinstance(s_b, dict) and s_b.get("deploy_signal"))
+    alert_symbols = sorted(set(d["symbol"] for d in diffs if d.get("alert")))
+    max_basis = 0
+    max_basis_info = None
+    for ex_name, ex_b in basis.items():
+        for sym, b in ex_b.items():
+            if isinstance(b, dict) and b.get("basis_annual_pct", 0) > max_basis:
+                max_basis = b["basis_annual_pct"]
+                max_basis_info = {"exchange": ex_name, "symbol": sym, "basis_annual_pct": b["basis_annual_pct"]}
+
+    if args.json:
+        out = {
+            "exchanges_ok": ok,
+            "exchanges_failed": failed,
+            "deploy_signal_count": deploy_count,
+            "cross_exchange_alerts": alert_symbols,
+            "max_basis": max_basis_info,
+            "all_basis": basis,
+            "all_diffs": diffs,
+        }
+        print(json.dumps(out, ensure_ascii=False, indent=2, default=str))
+        return diffs
 
     # 生成报告
     report = print_report(data, diffs, ok, failed, basis)
     print()
     print(report[:500])
-
-    # 保存
     save_report(report, diffs)
 
-    # 应急检查
     for e in failed:
         if e in ("okx", "bybit"):
             print(f"\n⚠️ {e} 不可达 — 大陆 IP 基础设施限制!")
 
-    # Deploy signal check
-    deploy_count = sum(1 for ex_b in basis.values() for s_b in ex_b.values() if isinstance(s_b, dict) and s_b.get("deploy_signal"))
     if deploy_count > 0:
         print(f"\n🟢 Deploy signal! {deploy_count} 条触发 P50+ threshold")
     else:
         print(f"\n⏸️ No deploy signal. Current funding below P50 (11%/yr)")
 
-    if any(d["alert"] for d in diffs):
-        alert_symbols = set(d["symbol"] for d in diffs if d["alert"])
+    if alert_symbols:
         print(f"\n🔴 预警: {alert_symbols} 跨所 funding diff 超阈值!")
     else:
         print(f"\n✓ 当前跨所 funding diff 在阈值内")
