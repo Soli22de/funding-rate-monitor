@@ -85,6 +85,34 @@ def fetch_all_rates() -> Dict[str, Dict[str, Dict]]:
     return results, ex_names_ok, ex_names_failed
 
 
+def fetch_basis(data: Dict, ex_names_ok: List[str]) -> Dict[str, Dict]:
+    """拉现货价格计算 spot+perp basis（单一交易所可做的 delta-neutral 套利）"""
+    basis = {}
+    for ex_name in EXCHANGES:
+        if ex_name not in data:
+            continue
+        basis[ex_name] = {}
+        for symbol in SYMBOLS:
+            fr_data = data.get(ex_name, {}).get(symbol)
+            if not fr_data:
+                continue
+            # The funding rate IS the basis (premium of perp over spot, annualized)
+            # For spot+perp arb: you buy spot + short perp, collect funding
+            fr = fr_data.get("funding_rate")
+            if fr is None:
+                continue
+            # Annualized basis = funding_rate * 3 * 365
+            basis_annual = fr * 3 * 365 * 100
+            basis[ex_name][symbol] = {
+                "funding_rate_8h": fr,
+                "basis_annual_pct": round(basis_annual, 2),
+                "mark_price": fr_data.get("mark_price"),
+                "index_price": fr_data.get("index_price"),
+                "deploy_signal": basis_annual >= 11.0,  # P50 threshold
+            }
+    return basis
+
+
 def compute_diffs(data: Dict) -> List[Dict]:
     """计算跨所 funding rate 差异"""
     diffs = []
@@ -120,13 +148,38 @@ def compute_diffs(data: Dict) -> List[Dict]:
 
 
 def print_report(data: Dict, diffs: List[Dict],
-                  ex_names_ok: List[str], ex_names_failed: List[str]):
+                  ex_names_ok: List[str], ex_names_failed: List[str],
+                  basis: Optional[Dict] = None):
     """输出 Markdown 格式报告"""
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     lines = []
     lines.append("# Funding Rate 监控报告\n")
     lines.append(f"**时间**: {now}\n")
     lines.append(f"**交易所状态**: OK={ex_names_ok} FAILED={ex_names_failed}\n")
+    lines.append("---\n")
+
+    # Spot+perp basis (single exchange) — the actual deployable strategy
+    lines.append("## Spot+Perp Basis (deployable alpha)\n")
+    lines.append("策略：同一交易所买入现货 + 做空永续 → delta-neutral 收 funding\n")
+    lines.append("")
+    lines.append("| 交易所 | 币种 | Funding/8h | 年化 Basis | 部署信号 (>11%/yr) |")
+    lines.append("|--------|------|:---------:|:---------:|:-----------------:|")
+    
+    for ex in EXCHANGES:
+        if basis and ex in basis:
+            for symbol in SYMBOLS:
+                b = basis[ex].get(symbol)
+                if b:
+                    signal = "🟢 DEPLOY" if b["deploy_signal"] else "⏸️ standby"
+                    lines.append(
+                        f"| {ex} | {symbol} | {b['funding_rate_8h']*100:+.4f}% | "
+                        f"{b['basis_annual_pct']:+.1f}%/yr | {signal} |"
+                    )
+    
+    lines.append("")
+    lines.append("**部署规则**: funding rate > 0.01%/8h (≈11%/yr, 历史 P50) → deploy signal.")
+    lines.append("**费用**: 一次性 round-trip maker fee ~0.24% (OKX) 或 ~0% (MEXC).")
+    lines.append("")
     lines.append("---\n")
 
     # 每所每个币种的 funding rate
@@ -165,6 +218,30 @@ def print_report(data: Dict, diffs: List[Dict],
                 f"{d['diff_annual_pct']:+.1f}% | {alert} |"
             )
 
+    lines.append("")
+    lines.append("---\n")
+
+    # Spot+perp basis (single exchange) — the actual deployable strategy
+    lines.append("## Spot+Perp Basis (deployable alpha)\n")
+    lines.append("策略：同一交易所买入现货 + 做空永续 → delta-neutral 收 funding\n")
+    lines.append("")
+    lines.append("| 交易所 | 币种 | Funding/8h | 年化 Basis | 部署信号 (>11%/yr) |")
+    lines.append("|--------|------|:---------:|:---------:|:-----------------:|")
+    
+    for ex in EXCHANGES:
+        if basis and ex in basis:
+            for symbol in SYMBOLS:
+                b = basis[ex].get(symbol)
+                if b:
+                    signal = "🟢 DEPLOY" if b["deploy_signal"] else "⏸️ standby"
+                    lines.append(
+                        f"| {ex} | {symbol} | {b['funding_rate_8h']*100:+.4f}% | "
+                        f"{b['basis_annual_pct']:+.1f}%/yr | {signal} |"
+                    )
+    
+    lines.append("")
+    lines.append("**部署规则**: funding rate > 0.01%/8h (≈11%/yr, 历史 P50) → deploy signal.")
+    lines.append("**费用**: 一次性 round-trip maker fee ~0.24% (OKX) 或 ~0% (MEXC).")
     lines.append("")
     lines.append("---\n")
     lines.append(f"*生成时间: {now}*\n")
@@ -207,8 +284,11 @@ def main():
     print("[2/2] 计算跨所差异...")
     diffs = compute_diffs(data)
 
+    # 计算 spot+perp basis
+    basis = fetch_basis(data, ok)
+
     # 生成报告
-    report = print_report(data, diffs, ok, failed)
+    report = print_report(data, diffs, ok, failed, basis)
     print()
     print(report[:500])
 
@@ -219,6 +299,13 @@ def main():
     for e in failed:
         if e in ("okx", "bybit"):
             print(f"\n⚠️ {e} 不可达 — 大陆 IP 基础设施限制!")
+
+    # Deploy signal check
+    deploy_count = sum(1 for ex_b in basis.values() for s_b in ex_b.values() if isinstance(s_b, dict) and s_b.get("deploy_signal"))
+    if deploy_count > 0:
+        print(f"\n🟢 Deploy signal! {deploy_count} 条触发 P50+ threshold")
+    else:
+        print(f"\n⏸️ No deploy signal. Current funding below P50 (11%/yr)")
 
     if any(d["alert"] for d in diffs):
         alert_symbols = set(d["symbol"] for d in diffs if d["alert"])
