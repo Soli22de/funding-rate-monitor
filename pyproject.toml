@@ -1,0 +1,11 @@
+[project]
+name = "funding-rate-monitor"
+version = "0.1.0"
+description = "跨所 funding rate 差异监控（V0 不下单）"
+requires-python = ">=3.11"
+dependencies = [
+    "ccxt>=4.4.0",
+    "pandas>=2.0.0",
+    "numpy>=1.24.0",
+    "rich>=13.0.0",
+]

@@ -1,0 +1,83 @@
+[
+  {
+    "symbol": "SOL/USDT:USDT",
+    "pair": "okx vs bybit",
+    "rate_a": -1.97118847247e-05,
+    "rate_b": 9.872e-05,
+    "diff_8h": 0.000118,
+    "diff_annual_pct": 12.97,
+    "alert": false
+  },
+  {
+    "symbol": "SOL/USDT:USDT",
+    "pair": "bybit vs mexc",
+    "rate_a": 9.872e-05,
+    "rate_b": -1e-06,
+    "diff_8h": 0.0001,
+    "diff_annual_pct": 10.92,
+    "alert": false
+  },
+  {
+    "symbol": "ETH/USDT:USDT",
+    "pair": "bybit vs mexc",
+    "rate_a": -2.75e-06,
+    "rate_b": 7.8e-05,
+    "diff_8h": 8.1e-05,
+    "diff_annual_pct": 8.84,
+    "alert": false
+  },
+  {
+    "symbol": "ETH/USDT:USDT",
+    "pair": "okx vs mexc",
+    "rate_a": 2.15873702404e-05,
+    "rate_b": 7.8e-05,
+    "diff_8h": 5.6e-05,
+    "diff_annual_pct": 6.18,
+    "alert": false
+  },
+  {
+    "symbol": "ETH/USDT:USDT",
+    "pair": "okx vs bybit",
+    "rate_a": 2.15873702404e-05,
+    "rate_b": -2.75e-06,
+    "diff_8h": 2.4e-05,
+    "diff_annual_pct": 2.66,
+    "alert": false
+  },
+  {
+    "symbol": "BTC/USDT:USDT",
+    "pair": "okx vs bybit",
+    "rate_a": 4.67617090329e-05,
+    "rate_b": 6.605e-05,
+    "diff_8h": 1.9e-05,
+    "diff_annual_pct": 2.11,
+    "alert": false
+  },
+  {
+    "symbol": "SOL/USDT:USDT",
+    "pair": "okx vs mexc",
+    "rate_a": -1.97118847247e-05,
+    "rate_b": -1e-06,
+    "diff_8h": 1.9e-05,
+    "diff_annual_pct": 2.05,
+    "alert": false
+  },
+  {
+    "symbol": "BTC/USDT:USDT",
+    "pair": "bybit vs mexc",
+    "rate_a": 6.605e-05,
+    "rate_b": 5.6e-05,
+    "diff_8h": 1e-05,
+    "diff_annual_pct": 1.1,
+    "alert": false
+  },
+  {
+    "symbol": "BTC/USDT:USDT",
+    "pair": "okx vs mexc",
+    "rate_a": 4.67617090329e-05,
+    "rate_b": 5.6e-05,
+    "diff_8h": 9e-06,
+    "diff_annual_pct": 1.01,
+    "alert": false
+  }
+]
